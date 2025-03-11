@@ -66,8 +66,8 @@ async function consultarCPEAutomotor({ cuitRepresentada, nroCTG = 0, cuitSolicit
                 </auth>
                 <solicitud>
                     ${nroCTG
-            ? `<nroCTG>${nroCTG}</nroCTG>`
-            : `<cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
+                    ? `<nroCTG>${nroCTG}</nroCTG>`
+                    : `<cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
                            <cartaPorte>
                                <tipoCPE>${tipoCPE}</tipoCPE>
                                <sucursal>${sucursal}</sucursal>
@@ -82,7 +82,6 @@ async function consultarCPEAutomotor({ cuitRepresentada, nroCTG = 0, cuitSolicit
     try {
         const respuesta = await consultaSOAP('consultarCPEAutomotor', xmlRequest)
         return respuesta['soap:Envelope']['soap:Body']['ns2:ConsultarCPEAutomotorResp']['respuesta']
-
     } catch (error) {
         return error
     }
@@ -184,112 +183,177 @@ async function consultarLocalidadesProductor({ cuitRepresentada, cuitConsulta })
     }
 }
 
-async function autorizarCPE() {
+async function autorizarCPE({
+    cuitRepresentada,
+
+    //CABECERA
+    tipoCP,
+    cuitSolicitante,
+    sucursal,
+    nroOrden,
+
+    //ORIGEN
+    origen_operador_codProvincia, //OPC SI OPERADOR
+    origen_operador_codLocalidad, //OPC SI OPERADOR
+    origen_operador_planta, //OPC SI OPERADOR
+
+    origen_productor_codProvincia, //OPC SI PRODUCTOR
+    origen_productor_codLocalidad, //OPC SI PRODUCTOR
+    latitud_grados, //OPC SI PRODUCTOR // OPCIONAL
+    latitud_minutos, //OPC SI PRODUCTOR // OPCIONAL
+    latitud_segundos, //OPC SI PRODUCTOR // OPCIONAL
+    longitud_grados, //OPC SI PRODUCTOR // OPCIONAL
+    longitud_minutos, //OPC SI PRODUCTOR // OPCIONAL
+    longitud_segundos, //OPC SI PRODUCTOR // OPCIONAL
+    ubicacionGeoreferencial, //OPC SI PRODUCTOR // OPCIONAL
+
+    correspondeRetiroProductor,
+
+    esSolicitanteCampo,
+
+    cuitRemitenteComercialProductor, //OPC SI CORRESPONDE RETIRO PRODUCTOR
+
+    cuitRemitenteComercialVentaPrimaria,
+    cuitRemitenteComercialVentaSecundaria,
+    cuitRemitenteComercialVentaSecundaria2,
+    cuitMercadoATermino,
+    cuitCorredorVentaPrimaria,
+    cuitCorredorVentaSecundaria,
+    cuitRepresentanteEntregador,
+    cuitRepresentanteRecibidor,
+    codGrano,
+    cosecha,
+    pesoBruto,
+    pesoTara,
+    cuit,
+    esDestinoCampo,
+    codProvincia,
+    codLocalidad,
+    planta,
+    cuit,
+    cuitTransportista,
+    dominio,
+    fechaHoraPartida,
+    kmRecorrer,
+    codigoTurno,
+    cuitChofer,
+    tarifa,
+    cuitPagadorFlete,
+    cuitIntermediarioFlete,
+    mercaderiaFumigada,
+    observaciones
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
 
     const xmlRequestUltNumOrden = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
     <soapenv:Header/>
     <soapenv:Body>
         <wsc:AutorizarCPEAutomotorReq>
             <auth>
-                <token>${token}</token>
-                <sign>${sign}</sign>
-                <cuitRepresentada>30714518549</cuitRepresentada>
+                <token>${ticket.token}</token>
+                <sign>${ticket.sign}</sign>
+                <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
             </auth>
             <solicitud>
                 <cabecera>
-                    <tipoCP>?</tipoCP>
-                    <cuitSolicitante>?</cuitSolicitante>
-                    <sucursal>?</sucursal>
-                    <nroOrden>?</nroOrden>
+                    <tipoCP>${tipoCP}</tipoCP>
+                    <cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
+                    <sucursal>${sucursal}</sucursal>
+                    <nroOrden>${nroOrden}</nroOrden>
                 </cabecera>
                 <origen>
-                    <!--Optional:-->
-                    <operador>
-                        <codProvincia>?</codProvincia>
-                        <codLocalidad>?</codLocalidad>
-                        <planta>?</planta>
-                    </operador>
-                    <!--Optional:-->
-                    <productor>
-                        <codProvincia>?</codProvincia>
-                        <codLocalidad>?</codLocalidad>
-                        <!--Optional:-->
-                        <coordenadasGPS>
+                    ${origen_operador_planta ?
+                    `<operador>
+                        <codProvincia>${origen_operador_codProvincia}</codProvincia>
+                        <codLocalidad>${origen_operador_codLocalidad}</codLocalidad>
+                        <planta>${origen_operador_planta}</planta>
+                    </operador>`
+                    :
+                    `<productor>
+                        <codProvincia>${origen_productor_codProvincia}</codProvincia>
+                        <codLocalidad>${origen_productor_codLocalidad}</codLocalidad>
+                        ${latitud_grados && latitud_minutos && latitud_segundos && longitud_grados && longitud_minutos && longitud_segundos ?
+                        `<coordenadasGPS>
                             <latitud>
-                                <grados>?</grados>
-                                <minutos>?</minutos>
-                                <segundos>?</segundos>
+                                <grados>${latitud_grados}</grados>
+                                <minutos>${latitud_minutos}</minutos>
+                                <segundos>${latitud_segundos}</segundos>
                             </latitud>
                             <longitud>
-                                <grados>?</grados>
-                                <minutos>?</minutos>
-                                <segundos>?</segundos>
+                                <grados>${longitud_grados}</grados>
+                                <minutos>${longitud_minutos}</minutos>
+                                <segundos>${longitud_segundos}</segundos>
                             </longitud>
-                            <!--Optional:-->
-                            <ubicacionGeoreferencial>?</ubicacionGeoreferencial>
-                        </coordenadasGPS>
-                    </productor>
+                            ${ubicacionGeoreferencial ? 
+                            `<ubicacionGeoreferencial>${ubicacionGeoreferencial}</ubicacionGeoreferencial>` : ``}
+                        </coordenadasGPS>`:``}
+                    </productor>`
+                    }
                 </origen>
-                <correspondeRetiroProductor>?</correspondeRetiroProductor>
-                <esSolicitanteCampo>?</esSolicitanteCampo>
-                <!--Optional:-->
-                <retiroProductor>
-                    <cuitRemitenteComercialProductor>?</cuitRemitenteComercialProductor>
-                </retiroProductor>
+                <correspondeRetiroProductor>${correspondeRetiroProductor}</correspondeRetiroProductor>
+                <esSolicitanteCampo>${esSolicitanteCampo}</esSolicitanteCampo>
+                ${correspondeRetiroProductor ? 
+                `<retiroProductor>
+                    <cuitRemitenteComercialProductor>${cuitRemitenteComercialProductor}</cuitRemitenteComercialProductor>
+                </retiroProductor>` : ``}
+
                 <!--Optional:-->
                 <intervinientes>
                     <!--Optional:-->
-                    <cuitRemitenteComercialVentaPrimaria>?</cuitRemitenteComercialVentaPrimaria>
+                    <cuitRemitenteComercialVentaPrimaria>${cuitRemitenteComercialVentaPrimaria}</cuitRemitenteComercialVentaPrimaria>
                     <!--Optional:-->
-                    <cuitRemitenteComercialVentaSecundaria>?</cuitRemitenteComercialVentaSecundaria>
+                    <cuitRemitenteComercialVentaSecundaria>${cuitRemitenteComercialVentaSecundaria}</cuitRemitenteComercialVentaSecundaria>
                     <!--Optional:-->
-                    <cuitRemitenteComercialVentaSecundaria2>?</cuitRemitenteComercialVentaSecundaria2>
+                    <cuitRemitenteComercialVentaSecundaria2>${cuitRemitenteComercialVentaSecundaria2}</cuitRemitenteComercialVentaSecundaria2>
                     <!--Optional:-->
-                    <cuitMercadoATermino>?</cuitMercadoATermino>
+                    <cuitMercadoATermino>${cuitMercadoATermino}</cuitMercadoATermino>
                     <!--Optional:-->
-                    <cuitCorredorVentaPrimaria>?</cuitCorredorVentaPrimaria>
+                    <cuitCorredorVentaPrimaria>${cuitCorredorVentaPrimaria}</cuitCorredorVentaPrimaria>
                     <!--Optional:-->
-                    <cuitCorredorVentaSecundaria>?</cuitCorredorVentaSecundaria>
+                    <cuitCorredorVentaSecundaria>${cuitCorredorVentaSecundaria}</cuitCorredorVentaSecundaria>
                     <!--Optional:-->
-                    <cuitRepresentanteEntregador>?</cuitRepresentanteEntregador>
+                    <cuitRepresentanteEntregador>${cuitRepresentanteEntregador}</cuitRepresentanteEntregador>
                     <!--Optional:-->
-                    <cuitRepresentanteRecibidor>?</cuitRepresentanteRecibidor>
+                    <cuitRepresentanteRecibidor>${cuitRepresentanteRecibidor}</cuitRepresentanteRecibidor>
                 </intervinientes>
+
                 <datosCarga>
-                    <codGrano>?</codGrano>
-                    <cosecha>?</cosecha>
-                    <pesoBruto>?</pesoBruto>
-                    <pesoTara>?</pesoTara>
+                    <codGrano>${codGrano}</codGrano>
+                    <cosecha>${cosecha}</cosecha>
+                    <pesoBruto>${pesoBruto}</pesoBruto>
+                    <pesoTara>${pesoTara}</pesoTara>
                 </datosCarga>
                 <destino>
-                    <cuit>?</cuit>
-                    <esDestinoCampo>?</esDestinoCampo>
-                    <codProvincia>?</codProvincia>
-                    <codLocalidad>?</codLocalidad>
+                    <cuit>${cuit}</cuit>
+                    <esDestinoCampo>${esDestinoCampo}</esDestinoCampo>
+                    <codProvincia>${codProvincia}</codProvincia>
+                    <codLocalidad>${codLocalidad}</codLocalidad>
                     <!--Optional:-->
-                    <planta>?</planta>
+                    <planta>${planta}</planta>
                 </destino>
                 <destinatario>
-                    <cuit>?</cuit>
+                    <cuit>${cuit}</cuit>
                 </destinatario>
                 <transporte>
-                    <cuitTransportista>?</cuitTransportista>
+                    <cuitTransportista>${cuitTransportista}</cuitTransportista>
                     <!--1 or more repetitions:-->
-                    <dominio>?</dominio>
-                    <fechaHoraPartida>?</fechaHoraPartida>
-                    <kmRecorrer>?</kmRecorrer>
+                    <dominio>${dominio}</dominio>
+                    <fechaHoraPartida>${fechaHoraPartida}</fechaHoraPartida>
+                    <kmRecorrer>${kmRecorrer}</kmRecorrer>
                     <!--Optional:-->
-                    <codigoTurno>?</codigoTurno>
-                    <cuitChofer>?</cuitChofer>
+                    <codigoTurno>${codigoTurno}</codigoTurno>
+                    <cuitChofer>${cuitChofer}</cuitChofer>
                     <!--Optional:-->
-                    <tarifa>?</tarifa>
-                    <cuitPagadorFlete>?</cuitPagadorFlete>
+                    <tarifa>${tarifa}</tarifa>
+                    <cuitPagadorFlete>${cuitPagadorFlete}</cuitPagadorFlete>
                     <!--Optional:-->
-                    <cuitIntermediarioFlete>?</cuitIntermediarioFlete>
-                    <mercaderiaFumigada>?</mercaderiaFumigada>
+                    <cuitIntermediarioFlete>${cuitIntermediarioFlete}</cuitIntermediarioFlete>
+                    <mercaderiaFumigada>${mercaderiaFumigada}</mercaderiaFumigada>
                 </transporte>
                 <!--Optional:-->
-                <observaciones>?</observaciones>
+                <observaciones>${observaciones}</observaciones>
             </solicitud>
         </wsc:AutorizarCPEAutomotorReq>
     </soapenv:Body>
@@ -306,7 +370,7 @@ async function autorizarCPE() {
 
 
 
-/* 
+/*
 consultarCPEAutomotor({ cuitRepresentada: 30714518549, cuitSolicitante: 30714518549, tipoCPE: 74, sucursal: 1, nroOrden: 1000 })
     .then(res => {
         fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
@@ -325,4 +389,7 @@ consultarLocalidadesProductor({ cuitRepresentada: 30714518549, cuitConsulta: 307
     })
 */
 
-//autorizarCPE()
+consultarCPEAutomotor({ cuitRepresentada: 30714518549, cuitSolicitante: 30714518549, tipoCPE: 74, sucursal: 1, nroOrden: 123 })
+    .then(res => {
+        fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
