@@ -65,7 +65,7 @@ class WSAA {
 
     async generarTicket() {
         try {
-            const cms = this.generarCMS();
+            const cms = this.generarCMS(); // Asegúrate de que esta función existe y retorna un CMS válido.
 
             const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
                 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -78,45 +78,35 @@ class WSAA {
                     </soapenv:Body>
                 </soapenv:Envelope>`;
 
-
             const { response } = await soapRequest({
-                url: WSAA_URL,
+                url: WSAA_URL,  // Asegúrate de que WSAA_URL está definida.
                 headers: { 'Content-Type': 'text/xml; charset=utf-8', 'SOAPAction': '' },
                 xml: xmlRequest,
             });
 
             const parser = new xml2js.Parser({ explicitArray: false });
+            const parsedResponse = await parser.parseStringPromise(response.body);
 
-            parser.parseStringPromise(response.body)
-                .then(result => {
-                    // Obtener el XML en base64
-                    const loginCmsReturnBase64 = result['soapenv:Envelope']['soapenv:Body']['loginCmsResponse']['loginCmsReturn'];
+            // Obtener el XML en base64
+            const loginCmsReturnBase64 = parsedResponse['soapenv:Envelope']['soapenv:Body']['loginCmsResponse']['loginCmsReturn'];
 
-                    const parser_abajo = new xml2js.Parser({ explicitArray: false });
-                    parser_abajo.parseStringPromise(loginCmsReturnBase64)
-                        .then(result => {
+            const parser_abajo = new xml2js.Parser({ explicitArray: false });
+            const parsedTicket = await parser_abajo.parseStringPromise(loginCmsReturnBase64);
 
-                            const ticketAcceso = {
-                                token: result.loginTicketResponse.credentials.token,
-                                sign: result.loginTicketResponse.credentials.sign,
-                                expirationTime: result.loginTicketResponse.header.expirationTime
-                            };
+            const ticketAcceso = {
+                token: parsedTicket.loginTicketResponse.credentials.token,
+                sign: parsedTicket.loginTicketResponse.credentials.sign,
+                expirationTime: parsedTicket.loginTicketResponse.header.expirationTime
+            };
 
-                            // Guardar en archivo JSON
-                            try {
-                                fs.writeFileSync(`./tickets/${this.servicio}_${this.cuitSolicitante}.json`, JSON.stringify(ticketAcceso, null, 2), 'utf8');
-                                return ticketAcceso
-                            }
-                            catch (err) {
-                                console.error('Error al guardar el ticket:', err)
-                            }
-                        })
+            // Guardar en archivo JSON
+            const filePath = `./tickets/${this.servicio}_${this.cuitSolicitante}.json`;
+            fs.writeFileSync(filePath, JSON.stringify(ticketAcceso, null, 2), 'utf8');
 
-                })
-                .catch(err => console.error('Error al parsear XML:', err));
-
+            return ticketAcceso; // Retorna el ticket
         } catch (error) {
-            console.error('Erroor:', error);
+            console.error('Error:', error);
+            throw error; // Propaga el error
         }
     }
 
@@ -125,18 +115,16 @@ class WSAA {
             const ticket = JSON.parse(fs.readFileSync(`./tickets/${this.servicio}_${this.cuitSolicitante}.json`, 'utf8'));
 
             const expirationTime = new Date(ticket.expirationTime).getTime()
-            const ahora = new Date().getTime()
+            const ahora = Date.now()
 
-            if(ahora < expirationTime){
+            if (ahora < expirationTime) {
                 return ticket
             }
         }
 
-        return this.generarTicket()
+        const newTicket = await this.generarTicket()
+        return newTicket
     }
 }
 
-const wsaa = new WSAA(30714518549, 'wscpe');
-
-wsaa.obtenerTicket()
-    .then(asd => console.log(asd))
+module.exports = WSAA
