@@ -66,8 +66,8 @@ async function consultarCPEAutomotor({ cuitRepresentada, nroCTG = 0, cuitSolicit
                 </auth>
                 <solicitud>
                     ${nroCTG
-                    ? `<nroCTG>${nroCTG}</nroCTG>`
-                    : `<cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
+            ? `<nroCTG>${nroCTG}</nroCTG>`
+            : `<cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
                            <cartaPorte>
                                <tipoCPE>${tipoCPE}</tipoCPE>
                                <sucursal>${sucursal}</sucursal>
@@ -183,14 +183,100 @@ async function consultarLocalidadesProductor({ cuitRepresentada, cuitConsulta })
     }
 }
 
-async function autorizarCPE({
+async function consultarLocalidadesPorProvincia({ cuitRepresentada, codProvincia }) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:ConsultarLocalidadesPorProvinciaReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <codProvincia>${codProvincia}</codProvincia>
+                </solicitud>
+            </wsc:ConsultarLocalidadesPorProvinciaReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('consultarLocalidadesPorProvincia', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:ConsultarLocalidadesPorProvinciaResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function consultarProvincias({ cuitRepresentada }) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:ConsultarProvinciasReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+            </wsc:ConsultarProvinciasReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('consultarProvincias', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:ConsultarProvinciasResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function consultarTiposGrano({ cuitRepresentada }) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:ConsultarTiposGranoReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+            </wsc:ConsultarTiposGranoReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('consultarTiposGrano', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:ConsultarTiposGranoResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function autorizarCPEAutomotor({
     cuitRepresentada,
 
     //CABECERA
     tipoCP,
     cuitSolicitante,
     sucursal,
-    nroOrden,
 
     //ORIGEN
     origen_operador_codProvincia, //OPC SI OPERADOR
@@ -256,6 +342,9 @@ async function autorizarCPE({
     const wsaa = new WSAA(cuitRepresentada, 'wscpe')
     const ticket = await wsaa.obtenerTicket()
 
+    const ultNroOrden = await consultarUltNumOrden({ cuitRepresentada: cuitRepresentada, sucursal: sucursal, tipoCPE: tipoCP })
+    const nroOrden = parseInt(ultNroOrden['nroOrden']) + 1
+
     const xmlRequest = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
     <soapenv:Header/>
     <soapenv:Body>
@@ -274,17 +363,17 @@ async function autorizarCPE({
                 </cabecera>
                 <origen>
                     ${origen_operador_planta ?
-                    `<operador>
+            `<operador>
                         <codProvincia>${origen_operador_codProvincia}</codProvincia>
                         <codLocalidad>${origen_operador_codLocalidad}</codLocalidad>
                         <planta>${origen_operador_planta}</planta>
                     </operador>`
-                    :
-                    `<productor>
+            :
+            `<productor>
                         <codProvincia>${origen_productor_codProvincia}</codProvincia>
                         <codLocalidad>${origen_productor_codLocalidad}</codLocalidad>
                         ${latitud_grados && latitud_minutos && latitud_segundos && longitud_grados && longitud_minutos && longitud_segundos ?
-                        `<coordenadasGPS>
+                `<coordenadasGPS>
                             <latitud>
                                 <grados>${latitud_grados}</grados>
                                 <minutos>${latitud_minutos}</minutos>
@@ -295,36 +384,36 @@ async function autorizarCPE({
                                 <minutos>${longitud_minutos}</minutos>
                                 <segundos>${longitud_segundos}</segundos>
                             </longitud>
-                            ${ubicacionGeoreferencial ? 
-                            `<ubicacionGeoreferencial>${ubicacionGeoreferencial}</ubicacionGeoreferencial>` : ``}
-                        </coordenadasGPS>`:``}
+                            ${ubicacionGeoreferencial ?
+                    `<ubicacionGeoreferencial>${ubicacionGeoreferencial}</ubicacionGeoreferencial>` : ``}
+                        </coordenadasGPS>`: ``}
                     </productor>`
-                    }
+        }
                 </origen>
                 <correspondeRetiroProductor>${correspondeRetiroProductor}</correspondeRetiroProductor>
                 <esSolicitanteCampo>${esSolicitanteCampo}</esSolicitanteCampo>
-                ${correspondeRetiroProductor ? 
-                `<retiroProductor>
+                ${correspondeRetiroProductor ?
+            `<retiroProductor>
                     <cuitRemitenteComercialProductor>${cuitRemitenteComercialProductor}</cuitRemitenteComercialProductor>
                 </retiroProductor>` : ``}
-                ${cuitRemitenteComercialVentaPrimaria || 
-                  cuitRemitenteComercialVentaSecundaria || 
-                  cuitRemitenteComercialVentaSecundaria2 || 
-                  cuitMercadoATermino || 
-                  cuitCorredorVentaPrimaria || 
-                  cuitCorredorVentaSecundaria || 
-                  cuitRepresentanteEntregador || 
-                  cuitRepresentanteRecibidor ? `
+                ${cuitRemitenteComercialVentaPrimaria ||
+            cuitRemitenteComercialVentaSecundaria ||
+            cuitRemitenteComercialVentaSecundaria2 ||
+            cuitMercadoATermino ||
+            cuitCorredorVentaPrimaria ||
+            cuitCorredorVentaSecundaria ||
+            cuitRepresentanteEntregador ||
+            cuitRepresentanteRecibidor ? `
                 <intervinientes>
-                    ${ cuitRemitenteComercialVentaPrimaria ? `<cuitRemitenteComercialVentaPrimaria>${cuitRemitenteComercialVentaPrimaria}</cuitRemitenteComercialVentaPrimaria>` : `` }
-                    ${ cuitRemitenteComercialVentaSecundaria ? `<cuitRemitenteComercialVentaSecundaria>${cuitRemitenteComercialVentaSecundaria}</cuitRemitenteComercialVentaSecundaria>` : `` }
-                    ${ cuitRemitenteComercialVentaSecundaria2 ? `<cuitRemitenteComercialVentaSecundaria2>${cuitRemitenteComercialVentaSecundaria2}</cuitRemitenteComercialVentaSecundaria2>` : `` }
-                    ${ cuitMercadoATermino ? `<cuitMercadoATermino>${cuitMercadoATermino}</cuitMercadoATermino>` : `` }
-                    ${ cuitCorredorVentaPrimaria ? `<cuitCorredorVentaPrimaria>${cuitCorredorVentaPrimaria}</cuitCorredorVentaPrimaria>` : `` }
-                    ${ cuitCorredorVentaSecundaria ? `<cuitCorredorVentaSecundaria>${cuitCorredorVentaSecundaria}</cuitCorredorVentaSecundaria>` : `` }
-                    ${ cuitRepresentanteEntregador ? `<cuitRepresentanteEntregador>${cuitRepresentanteEntregador}</cuitRepresentanteEntregador>` : `` }
-                    ${ cuitRepresentanteRecibidor ? `<cuitRepresentanteRecibidor>${cuitRepresentanteRecibidor}</cuitRepresentanteRecibidor>` : `` }
-                </intervinientes>`:``}
+                    ${cuitRemitenteComercialVentaPrimaria ? `<cuitRemitenteComercialVentaPrimaria>${cuitRemitenteComercialVentaPrimaria}</cuitRemitenteComercialVentaPrimaria>` : ``}
+                    ${cuitRemitenteComercialVentaSecundaria ? `<cuitRemitenteComercialVentaSecundaria>${cuitRemitenteComercialVentaSecundaria}</cuitRemitenteComercialVentaSecundaria>` : ``}
+                    ${cuitRemitenteComercialVentaSecundaria2 ? `<cuitRemitenteComercialVentaSecundaria2>${cuitRemitenteComercialVentaSecundaria2}</cuitRemitenteComercialVentaSecundaria2>` : ``}
+                    ${cuitMercadoATermino ? `<cuitMercadoATermino>${cuitMercadoATermino}</cuitMercadoATermino>` : ``}
+                    ${cuitCorredorVentaPrimaria ? `<cuitCorredorVentaPrimaria>${cuitCorredorVentaPrimaria}</cuitCorredorVentaPrimaria>` : ``}
+                    ${cuitCorredorVentaSecundaria ? `<cuitCorredorVentaSecundaria>${cuitCorredorVentaSecundaria}</cuitCorredorVentaSecundaria>` : ``}
+                    ${cuitRepresentanteEntregador ? `<cuitRepresentanteEntregador>${cuitRepresentanteEntregador}</cuitRepresentanteEntregador>` : ``}
+                    ${cuitRepresentanteRecibidor ? `<cuitRepresentanteRecibidor>${cuitRepresentanteRecibidor}</cuitRepresentanteRecibidor>` : ``}
+                </intervinientes>`: ``}
                 <datosCarga>
                     <codGrano>${codGrano}</codGrano>
                     <cosecha>${cosecha}</cosecha>
@@ -344,8 +433,8 @@ async function autorizarCPE({
                 <transporte>
                     <cuitTransportista>${cuitTransportista}</cuitTransportista>
                     ${dominios.map(dominio => {
-                        return `<dominio>${dominio}</dominio>`
-                    }).join('\n                    ')}
+                return `<dominio>${dominio}</dominio>`
+            }).join('')}
                     <fechaHoraPartida>${fechaHoraPartida}</fechaHoraPartida>
                     <kmRecorrer>${kmRecorrer}</kmRecorrer>
                     ${codigoTurno ? `<codigoTurno>${codigoTurno}</codigoTurno>` : ``}
@@ -360,10 +449,6 @@ async function autorizarCPE({
         </wsc:AutorizarCPEAutomotorReq>
     </soapenv:Body>
 </soapenv:Envelope>`
-    
-    console.log(xmlRequest)
-
-    return 0
 
     try {
         const respuesta = await consultaSOAP('autorizarCPEAutomotor', xmlRequest)
@@ -374,8 +459,526 @@ async function autorizarCPE({
     }
 }
 
+async function anularCPE({ cuitRepresentada, tipoCPE, sucursal, nroOrden, anulacionMotivo, anulacionObservaciones }) {
 
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
 
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:AnularCPEReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <cartaPorte>
+                        <tipoCPE>${tipoCPE}</tipoCPE>
+                        <sucursal>${sucursal}</sucursal>
+                        <nroOrden>${nroOrden}</nroOrden>
+                    </cartaPorte>
+                    ${anulacionMotivo ? `<anulacionMotivo>${anulacionMotivo}</anulacionMotivo>` : ``}
+                    ${anulacionObservaciones ? `<anulacionObservaciones>${anulacionObservaciones}</anulacionObservaciones>` : ``}
+                </solicitud>
+            </wsc:AnularCPEReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('anularCPE', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:AnularCPEResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function informarContingencia({
+    cuitRepresentada,
+
+    tipoCPE,
+    sucursal,
+    nroOrden,
+
+    concepto, //A, B, C, D, E, F: descripcion
+    descripcion //si concepto F
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    /*
+    A: Siniestro
+    B: Imposibilidad de tránsito por zona desfavorable
+    C: Desperfecto Mecánico
+    D: Accidente
+    E: Demora de descarga
+    F: Otro //detallar
+    */
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:InformarContingenciaReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <cartaPorte>
+                        <tipoCPE>${tipoCPE}</tipoCPE>
+                        <sucursal>${sucursal}</sucursal>
+                        <nroOrden>${nroOrden}</nroOrden>
+                    </cartaPorte>
+                    <contingencia>
+                        <concepto>${concepto}</concepto>
+                        ${concepto == 'F' ? `<descripcion>${descripcion}</descripcion>` : ``}
+                    </contingencia>
+                </solicitud>
+            </wsc:InformarContingenciaReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('informarContingencia', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:InformarContingenciaResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+
+}
+
+async function cerrarContingenciaCPE({
+    cuitRepresentada,
+    tipoCPE,
+    sucursal,
+    nroOrden,
+    concepto, //A reactivacion, B extension, C desactivacion
+    reactivacion_cuitTransportista, //si concepto A ó reactivacion_nroOperativo
+    reactivacion_nroOperativo, //si concepto A ó reactivacion_cuitTransportista
+    desactivacion_concepto, //A destruccion del vehiculo, B destruccion de la carga, C otro
+    desactivacion_descripcion //si des C
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    /*
+    MOTIVO CIERRE CONTINGENCIA:
+    A: Reactivación para Descarga en Destino
+    B: Extensión de tiempo de contingencia
+    C: Desactivar definitivamente la Carta de Porte //DETALLAR MOTIVO (ABAJO)
+
+    MOTIVO DESACTIVACION CONTINGENCIA:
+    A: Destrucción del Vehículo
+    B: Destrucción de la Carga
+    C: Otro //DETALLAR
+    */
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:CerrarContingenciaCPEReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <cartaPorte>
+                        <tipoCPE>${tipoCPE}</tipoCPE>
+                        <sucursal>${sucursal}</sucursal>
+                        <nroOrden>${nroOrden}</nroOrden>
+                    </cartaPorte>
+                    <concepto>${concepto}</concepto>
+                    ${concepto == 'A' ?
+            `<reactivacionDestino>
+                        ${reactivacion_cuitTransportista ?
+                `<cuitTransportista>${reactivacion_cuitTransportista}</cuitTransportista>` :
+                `<nroOperativo>${reactivacion_nroOperativo}</nroOperativo>`}
+                    </reactivacionDestino>
+                    `: ``}
+                    ${concepto == 'C' ?
+            `<motivoDesactivacionCP>
+                        <concepto>${desactivacion_concepto}</concepto>
+                        ${desactivacion_concepto == 'C' ? `<descripcion>${desactivacion_descripcion}</descripcion>` : ``}
+                    </motivoDesactivacionCP>
+                    `: ``}
+                </solicitud>
+            </wsc:CerrarContingenciaCPEReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('cerrarContingenciaCPE', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:CerrarContingenciaCPEResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+
+}
+
+async function editarCPEAutomotor({
+    cuitRepresentada,
+    nroCTG,
+    cuitRemitenteComercialVentaPrimaria, //OPC
+    cuitRemitenteComercialVentaSecundaria, //OPC
+    cuitRemitenteComercialVentaSecundaria2, //OPC
+    cuitCorredorVentaPrimaria, //OPC
+    cuitCorredorVentaSecundaria, //OPC
+    cuitDestinatario,
+    cuitChofer,
+    cuitTransportista,
+
+    //DESTINO
+    cuitDestino,
+    esDestinoCampo,
+    codProvincia,
+    codLocalidad,
+    planta, //OPC
+
+    cosecha, //OPC
+    pesoBruto,
+    codGrano,
+    dominios = [],
+    kmRecorrer, //OPC
+    tarifa, //OPC
+    observaciones //OPC
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:EditarCPEAutomotorReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <nroCTG>${nroCTG}</nroCTG>
+                    ${cuitRemitenteComercialVentaPrimaria ? `<cuitRemitenteComercialVentaPrimaria>${cuitRemitenteComercialVentaPrimaria}</cuitRemitenteComercialVentaPrimaria>` : ``}
+                    ${cuitRemitenteComercialVentaSecundaria ? `<cuitRemitenteComercialVentaSecundaria>${cuitRemitenteComercialVentaSecundaria}</cuitRemitenteComercialVentaSecundaria>` : ``}
+                    ${cuitRemitenteComercialVentaSecundaria2 ? `<cuitRemitenteComercialVentaSecundaria2>${cuitRemitenteComercialVentaSecundaria2}</cuitRemitenteComercialVentaSecundaria2>` : ``}
+                    ${cuitCorredorVentaPrimaria ? `<cuitCorredorVentaPrimaria>${cuitCorredorVentaPrimaria}</cuitCorredorVentaPrimaria>` : ``}
+                    ${cuitCorredorVentaSecundaria ? `<cuitCorredorVentaSecundaria>${cuitCorredorVentaSecundaria}</cuitCorredorVentaSecundaria>` : ``}
+                    <cuitDestinatario>${cuitDestinatario}</cuitDestinatario>
+                    <cuitChofer>${cuitChofer}</cuitChofer>
+                    <cuitTransportista>${cuitTransportista}</cuitTransportista>
+                    <destino>
+                        <cuit>${cuitDestino}</cuit>
+                        <esDestinoCampo>${esDestinoCampo}</esDestinoCampo>
+                        <codProvincia>${codProvincia}</codProvincia>
+                        <codLocalidad>${codLocalidad}</codLocalidad>
+                        ${planta ? `<planta>${planta}</planta>` : ``}
+                    </destino>
+                    ${cosecha ? `<cosecha>${cosecha}</cosecha>` : ``}
+                    <pesoBruto>${pesoBruto}</pesoBruto>
+                    <codGrano>${codGrano}</codGrano>
+                    ${dominios.map(dominio => {
+        return `<dominio>${dominio}</dominio>`
+    }).join('')}
+                    ${kmRecorrer ? `<kmRecorrer>${kmRecorrer}</kmRecorrer>` : ``}
+                    ${tarifa ? `<tarifa>${tarifa}</tarifa>` : ``}
+                    ${observaciones ? `<observaciones>${observaciones}</observaciones>` : ``}
+                </solicitud>
+            </wsc:EditarCPEAutomotorReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('editarCPEAutomotor', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:EditarCPEAutomotorResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function editarCPEConfirmadaAutomotor({
+    cuitRepresentada,
+    nroCTG,
+
+    cuitRemitenteComercialVentaPrimaria, //OPC
+    cuitRemitenteComercialVentaSecundaria, //OPC
+    cuitCorredorVentaPrimaria, //OPC
+    cuitCorredorVentaSecundaria, //OPC
+    cuitRemitenteComercialProductor //OPC
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:EditarCPEConfirmadaAutomotorReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <nroCTG>${nroCTG}</nroCTG>
+                    <intervinientes>
+                        ${cuitRemitenteComercialVentaPrimaria ? `<cuitRemitenteComercialVentaPrimaria>${cuitRemitenteComercialVentaPrimaria}</cuitRemitenteComercialVentaPrimaria>` : ``}
+                        ${cuitRemitenteComercialVentaSecundaria ? `<cuitRemitenteComercialVentaSecundaria>${cuitRemitenteComercialVentaSecundaria}</cuitRemitenteComercialVentaSecundaria>` : ``}
+                        ${cuitCorredorVentaPrimaria ? `<cuitCorredorVentaPrimaria>${cuitCorredorVentaPrimaria}</cuitCorredorVentaPrimaria>` : ``}
+                        ${cuitCorredorVentaSecundaria ? `<cuitCorredorVentaSecundaria>${cuitCorredorVentaSecundaria}</cuitCorredorVentaSecundaria>` : ``}
+                        ${cuitRemitenteComercialProductor ? `<cuitRemitenteComercialProductor>${cuitRemitenteComercialProductor}</cuitRemitenteComercialProductor>` : ``}
+                    </intervinientes>
+                </solicitud>
+            </wsc:EditarCPEConfirmadaAutomotorReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('editarCPEConfirmadaAutomotor', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:EditarCPEConfirmadaAutomotorResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function desvioCPEAutomotor({
+    cuitRepresentada,
+    cuitSolicitante,
+    tipoCPE,
+    sucursal,
+    nroOrden,
+
+    destinoCuit,
+    codProvincia,
+    codLocalidad,
+    planta,
+    esDestinoCampo,
+    fechaHoraPartida,
+    kmRecorrer,
+    codigoTurno //OPCIONAL
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:DesvioCPEAutomotorReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
+                    <cartaPorte>
+                        <tipoCPE>${tipoCPE}</tipoCPE>
+                        <sucursal>${sucursal}</sucursal>
+                        <nroOrden>${nroOrden}</nroOrden>
+                    </cartaPorte>
+                    <destino>
+                        <cuit>${destinoCuit}</cuit>
+                        <codProvincia>${codProvincia}</codProvincia>
+                        <codLocalidad>${codLocalidad}</codLocalidad>
+                        <planta>${planta}</planta>
+                        <esDestinoCampo>${esDestinoCampo}</esDestinoCampo>
+                    </destino>
+                    <transporte>
+                        <fechaHoraPartida>${fechaHoraPartida}</fechaHoraPartida>
+                        <kmRecorrer>${kmRecorrer}</kmRecorrer>
+                        <codigoTurno>${codigoTurno}</codigoTurno>
+                    </transporte>
+                </solicitud>
+            </wsc:DesvioCPEAutomotorReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('desvioCPEAutomotor', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:DesvioCPEAutomotorResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function confirmarArriboCPE({ cuitRepresentada, cuitSolicitante, tipoCPE, sucursal, nroOrden }) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:ConfirmarArriboCPEReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
+                    <cartaPorte>
+                        <tipoCPE>${tipoCPE}</tipoCPE>
+                        <sucursal>${sucursal}</sucursal>
+                        <nroOrden>${nroOrden}</nroOrden>
+                    </cartaPorte>
+                </solicitud>
+            </wsc:ConfirmarArriboCPEReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('confirmarArriboCPE', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:ConfirmarArriboCPEResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function confirmacionDefinitivaCPEAutomotor({
+    cuitRepresentada,
+    cuitSolicitante,
+    tipoCPE,
+    sucursal,
+    nroOrden,
+    cuitRepresentanteRecibidor, //OPC
+    pesoBrutoDescarga,
+    pesoTaraDescarga
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:ConfirmacionDefinitivaCPEAutomotorReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <cuitSolicitante>${cuitSolicitante}</cuitSolicitante>
+                    <cartaPorte>
+                        <tipoCPE>${tipoCPE}</tipoCPE>
+                        <sucursal>${sucursal}</sucursal>
+                        <nroOrden>${nroOrden}</nroOrden>
+                    </cartaPorte>
+                    ${cuitRepresentanteRecibidor ?
+            `<intervinientes>
+                        <cuitRepresentanteRecibidor>${cuitRepresentanteRecibidor}</cuitRepresentanteRecibidor>
+                    </intervinientes>` : ``}
+                    <pesoBrutoDescarga>${pesoBrutoDescarga}</pesoBrutoDescarga>
+                    <pesoTaraDescarga>${pesoTaraDescarga}</pesoTaraDescarga>
+                </solicitud>
+            </wsc:ConfirmacionDefinitivaCPEAutomotorReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('confirmacionDefinitivaCPEAutomotor', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:ConfirmacionDefinitivaCPEAutomotorResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function consultarCPEPorDestino({
+    cuitRepresentada,
+    planta,
+    fechaPartidaDesde,
+    fechaPartidaHasta,
+    tipoCartaPorte //OPCIONAL
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:ConsultarCPEPorDestinoReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <planta>${planta}</planta>
+                    <fechaPartidaDesde>${fechaPartidaDesde}</fechaPartidaDesde>
+                    <fechaPartidaHasta>${fechaPartidaHasta}</fechaPartidaHasta>
+                    ${tipoCartaPorte ? `<tipoCartaPorte>${tipoCartaPorte}</tipoCartaPorte>` : ``}
+                </solicitud>
+            </wsc:ConsultarCPEPorDestinoReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('consultarCPEPorDestino', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:ConsultarCPEPorDestinoResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
+
+async function consultarCPEPPendientesDeResolucion({
+    cuitRepresentada,
+    perfil,
+    planta, //OPCIONAL
+}) {
+
+    const wsaa = new WSAA(cuitRepresentada, 'wscpe')
+    const ticket = await wsaa.obtenerTicket()
+
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
+        <soapenv:Header/>
+        <soapenv:Body>
+            <wsc:ConsultarCPEPPendientesDeResolucionReq>
+                <auth>
+                    <token>${ticket.token}</token>
+                    <sign>${ticket.sign}</sign>
+                    <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+                </auth>
+                <solicitud>
+                    <perfil>${perfil}</perfil>
+                    ${planta ? `<planta>${planta}</planta>` : ``}
+                </solicitud>
+            </wsc:ConsultarCPEPPendientesDeResolucionReq>
+        </soapenv:Body>
+    </soapenv:Envelope>`
+
+    try {
+        const respuesta = await consultaSOAP('consultarCPEPPendientesDeResolucion', xmlRequest)
+
+        return respuesta['soap:Envelope']['soap:Body']['ns2:ConsultarCPEPPendientesDeResolucionResp']['respuesta']
+    } catch (error) {
+        return error
+    }
+}
 /*
 consultarCPEAutomotor({ cuitRepresentada: 30714518549, cuitSolicitante: 30714518549, tipoCPE: 74, sucursal: 1, nroOrden: 1000 })
     .then(res => {
@@ -396,14 +999,12 @@ consultarLocalidadesProductor({ cuitRepresentada: 30714518549, cuitConsulta: 307
 consultarCPEAutomotor({ cuitRepresentada: 30714518549, cuitSolicitante: 30714518549, tipoCPE: 74, sucursal: 1, nroOrden: 123 })
     .then(res => {
         fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
-})*/
-
-autorizarCPE({
+})
+autorizarCPEAutomotor({
     cuitRepresentada: '30714518549',
-    tipoCP: 'tipoCP',
+    tipoCP: '74',
     cuitSolicitante: 'cuitSolicitante',
-    sucursal: 'sucursal',
-    nroOrden: 'nroOrden',
+    sucursal: '1',
     origen_operador_codProvincia: 'origen_operador_codProvincia',
     origen_operador_codLocalidad: 'origen_operador_codLocalidad',
     origen_operador_planta: 'origen_operador_planta',
@@ -448,4 +1049,107 @@ autorizarCPE({
     cuitIntermediarioFlete: 'cuitIntermediarioFlete',
     mercaderiaFumigada: 'mercaderiaFumigada',
     observaciones: ''
+}).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
 })
+anularCPE({ cuitRepresentada, tipoCPE, sucursal, nroOrden, anulacionMotivo, anulacionObservaciones }).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+
+MOTIVOS ANULACION:
+1 - Siniestro
+2 - Pérdida de la carga
+3 - Otro //detallar
+
+MOTIVOS CONTINGENCIA:
+A: Siniestro
+B: Imposibilidad de tránsito por zona desfavorable
+C: Desperfecto Mecánico
+D: Accidente
+E: Demora de descarga
+F: Otro //detallar
+
+
+MOTIVO CIERRE CONTINGENCIA: ( concepto (? )
+A: Reactivación para Descarga en Destino
+B: Extensión de tiempo de contingencia
+C: Desactivar definitivamente la Carta de Porte //DETALLAR MOTIVO (ABAJO)
+
+MOTIVO DESACTIVACION CONTINGENCIA:
+A: Destrucción del Vehículo
+B: Destrucción de la Carga
+C: Otro //DETALLAR
+
+cerrarContingenciaCPE({
+    cuitRepresentada: 30714518549,
+    tipoCPE: 74,
+    sucursal: 2,
+    nroOrden: 425,
+    concepto: 'A', //A reactivacion, B extension, C desactivacion
+    reactivacion_cuitTransportista: 30714518549, //si concepto A ó reactivacion_nroOperativo
+    reactivacion_nroOperativo: '', //si concepto A ó reactivacion_cuitTransportista
+    desactivacion_concepto: '', //si concepto C: A destruccion del vehiculo, B destruccion de la carga, C otro
+    desactivacion_descripcion: '' //si des C
+}).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+editarCPEAutomotor({
+    cuitRepresentada: 30714518549, 
+    nroCTG: 10121036917,
+    cuitRemitenteComercialVentaPrimaria: '', //OPC
+    cuitRemitenteComercialVentaSecundaria: '', //OPC
+    cuitRemitenteComercialVentaSecundaria2: '', //OPC
+    cuitCorredorVentaPrimaria: '', //OPC
+    cuitCorredorVentaSecundaria: '', //OPC
+    cuitDestinatario: 30714518549,
+    cuitChofer: 20429875405,
+    cuitTransportista: 30714518549,
+    
+    //DESTINO
+    cuitDestino: 30714518549,
+    esDestinoCampo: 1,
+    codProvincia: 16,
+    codLocalidad: 10583,
+    planta: '', //OPC
+
+    cosecha: 2425, //OPC
+    pesoBruto: 45000,
+    codGrano: 2,
+    dominios: ['SGI191', 'LCA847'],
+    kmRecorrer: 5, //OPC
+    tarifa: 5000, //OPC
+    observaciones: '' //OPC
+}).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+confirmarArriboCPE({ cuitRepresentada: 30714518549, cuitSolicitante: 30714518549, tipoCPE: 74, sucursal: 2, nroOrden: 425}).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+confirmacionDefinitivaCPEAutomotor({ cuitRepresentada: 30714518549, cuitSolicitante: 30714518549, tipoCPE: 74, sucursal: 2, nroOrden: 425, cuitRepresentanteRecibidor: "", pesoBrutoDescarga: 45000, pesoTaraDescarga:15440}).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+consultarCPEPorDestino({ 
+    cuitRepresentada: 30714518549,
+    planta: 23475,
+    fechaPartidaDesde: '2025-02-25',
+    fechaPartidaHasta: '2025-02-27',
+    tipoCartaPorte: 74 //OPCIONAL
+}).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+consultarCPEPPendientesDeResolucion({ 
+    cuitRepresentada: 30714518549,
+    perfil: 'S', //S: Solicitante - D: Destino
+    planta: 23475, //OPCIONAL
+}).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+consultarLocalidadesPorProvincia({ cuitRepresentada: 30714518549, codProvincia: 16 }).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})
+consultarTiposGrano({ cuitRepresentada: 30714518549 }).then(res => {
+    fs.writeFileSync(`ticketresultCPE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+})*/
+
+//NuevoDestinoDestinatarioCPEAutomotorReq
+//RegresoOrigenCPEAutomotorReq
