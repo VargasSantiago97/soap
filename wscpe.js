@@ -95,7 +95,7 @@ class WSCPE {
                 </wsc:ConsultarCPEAutomotorReq>
             </soapenv:Body>
         </soapenv:Envelope>`;
-    
+
         try {
             const respuesta = await this.consultaSOAP('consultarCPEAutomotor', xmlRequest)
             return respuesta['soap:Envelope']['soap:Body']['ns2:ConsultarCPEAutomotorResp']['respuesta']
@@ -359,7 +359,7 @@ class WSCPE {
         const wsaa = new WSAA(cuitRepresentada, 'wscpe')
         const ticket = await wsaa.obtenerTicket()
     
-        const ultNroOrden = await consultarUltNumOrden({ cuitRepresentada: cuitRepresentada, sucursal: sucursal, tipoCPE: tipoCP })
+        const ultNroOrden = await this.consultarUltNumOrden({ cuitRepresentada: cuitRepresentada, sucursal: sucursal, tipoCPE: tipoCP })
         const nroOrden = parseInt(ultNroOrden['nroOrden']) + 1
     
         const xmlRequest = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsc="https://serviciosjava.afip.gob.ar/wscpe/">
@@ -1298,4 +1298,4 @@ NuevoDestinoDestinatarioCPEAutomotorReq
 RegresoOrigenCPEAutomotorReq
 */
 
-module.exports = WSAA
+module.exports = WSCPE

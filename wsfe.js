@@ -1,60 +1,100 @@
 const fs = require('fs');
+const soapRequest = require('easy-soap-request');
+const xml2js = require('xml2js');
 
-// Leer el archivo JSON con las credenciales
-const ticket = JSON.parse(fs.readFileSync('ticket.json', 'utf8'));
+const WSAA = require('./wsaa')
+const url = 'https://servicios1.afip.gov.ar/wsfev1/service.asmx';
 
-const token = ticket.token;
-const sign = ticket.sign;
+class WSFE {
 
-const operacion = 'FEParamGetPtosVenta';
+    async consultaSOAP(metodo, xmlRequest) {
+        try {
+            const { response } = await soapRequest({
+                url: url,
+                headers: {
+                    'Content-Type': 'text/xml; charset=utf-8',
+                    'SOAPAction': `http://ar.gov.afip.dif.FEV1/${metodo}`
+                },
+                xml: xmlRequest,
+            });
+    
+            const parser = new xml2js.Parser({ explicitArray: false });
+    
+            try {
+                const result = await parser.parseStringPromise(response.body)
+                return result
+            }
+            catch (err) {
+                console.error('Error al parsear XML:', err)
+            }
+        } catch (error) {
+            console.error('Error en la consulta:', error);
+        }
+    }
 
-const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    async FECompUltimoAutorizado(cuitRepresentada, PtoVta, CbteTipo) {
+
+        const wsaa = new WSAA(cuitRepresentada, 'wsfe')
+        const ticket = await wsaa.obtenerTicket()
+
+        const xmlRequest = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
     <soapenv:Header/>
     <soapenv:Body>
-        <${operacion} xmlns="http://ar.gov.afip.dif.FEV1/">
-            <Auth>
-                <Token>${token}</Token>
-                <Sign>${sign}</Sign>
-                <Cuit>27160862691</Cuit> <!-- TU CUIT -->
-            </Auth>
-            <PtoVta>3</PtoVta> <!-- Punto de venta -->
-            <CbteTipo>6</CbteTipo> <!-- Tipo de comprobante (Factura B = 6) -->
-        </${operacion}>
+        <ar:FECompUltimoAutorizado>
+            <ar:Auth>
+                <ar:Token>${ticket.token}</ar:Token>
+                <ar:Sign>${ticket.sign}</ar:Sign>
+                <ar:Cuit>${cuitRepresentada}</ar:Cuit>
+            </ar:Auth>
+            <ar:PtoVta>${PtoVta}</ar:PtoVta>
+            <ar:CbteTipo>${CbteTipo}</ar:CbteTipo>
+        </ar:FECompUltimoAutorizado>
     </soapenv:Body>
-</soapenv:Envelope>`;
+    </soapenv:Envelope>`;
 
+        try {
+            const respuesta = await this.consultaSOAP('FECompUltimoAutorizado', xmlRequest)
+            return respuesta ['soap:Envelope']['soap:Body']['FECompUltimoAutorizadoResponse']['FECompUltimoAutorizadoResult']
+        } catch (error) {
+            return error
+        }
+    }
 
+    async FEParamGetPtosVenta(cuitRepresentada) {
 
-const axios = require('axios');
+        const wsaa = new WSAA(cuitRepresentada, 'wsfe')
+        const ticket = await wsaa.obtenerTicket()
 
-async function consultarWSFE() {
-    const xml2js = require('xml2js');
-    const parser = new xml2js.Parser({ explicitArray: false });
+        const xmlRequest = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <ar:FEParamGetPtosVenta>
+            <ar:Auth>
+                <ar:Token>${ticket.token}</ar:Token>
+                <ar:Sign>${ticket.sign}</ar:Sign>
+                <ar:Cuit>${cuitRepresentada}</ar:Cuit>
+            </ar:Auth>
+        </ar:FEParamGetPtosVenta>
+    </soapenv:Body>
+    </soapenv:Envelope>`;
 
-    const url = 'https://servicios1.afip.gov.ar/wsfev1/service.asmx';
-    const headers = {
-        'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': `http://ar.gov.afip.dif.FEV1/${operacion}`
-    };
-
-    try {
-        const response = await axios.post(url, xmlRequest, { headers });
-        console.log('Respuesta de AFIP:', response.data);
-
-        parser.parseStringPromise(response.data)
-            .then(result => {
-
-                // Guardar en archivo JSON
-                fs.writeFileSync(`ticketresult-${new Date().getTime()}.json`, JSON.stringify(result, null, 2), 'utf8');
-
-            })
-            .catch(err => console.error('Error al parsear XML:', err));
-    } catch (error) {
-        console.error('Error en la consulta:', error);
+        try {
+            const respuesta = await this.consultaSOAP('FEParamGetPtosVenta', xmlRequest)
+            return respuesta ['soap:Envelope']['soap:Body']['FEParamGetPtosVentaResponse']['FEParamGetPtosVentaResult']
+        } catch (error) {
+            return error
+        }
     }
 }
 
-consultarWSFE();
+const wsfe = new WSFE()
+/*
+wsfe.FECompUltimoAutorizado(27160862691, 3, 6).then(res => {
+    //fs.writeFileSync(`ticketresultFE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+    console.log(res)
+})
+*/
+wsfe.FEParamGetPtosVenta(27160862691).then(res => {
+    //fs.writeFileSync(`ticketresultFE-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+    console.log(res['ResultGet']['PtoVenta'])
+})
