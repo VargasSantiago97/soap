@@ -166,10 +166,4 @@ class WS_SR_CONSTANCIA_INSCRIPCION {
     }
 }
 
-const ws = new WS_SR_CONSTANCIA_INSCRIPCION()
-ws.getPersonaList_v2({cuitRepresentada: 30714518549, cuitsConsulta: [30715327720, 27332276714, 20405003644]})
-.then(res => {
-    fs.writeFileSync(`./results/ws_sr_constancia_inscripcion/ticketresultConstancia-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
-})
-
-//module.exports = WS_SR_CONSTANCIA_INSCRIPCION
+module.exports = WS_SR_CONSTANCIA_INSCRIPCION
