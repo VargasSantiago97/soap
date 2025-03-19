@@ -120,16 +120,44 @@ class WS_SR_CONSTANCIA_INSCRIPCION {
             <token>${ticket.token}</token>
             <sign>${ticket.sign}</sign>
             <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
-
-            ${cuitsConsulta.map( e => `<idPersona>${e}</idPersona>` ).join('\n') }
-      < /a5:getPersonaList>
+            ${cuitsConsulta.map( e => `<idPersona>${e}</idPersona>` ).join('') }
+        </a5:getPersonaList>
     </soapenv:Body>
 </soapenv:Envelope>`
 
         try {
             const respuesta = await this.consultaSOAP('getPersonaList', xmlRequest)
 
-            return respuesta['soap:Envelope']['soap:Body']['ns2:getPersonaListResponse']['personaListReturn']
+            return respuesta['soap:Envelope']['soap:Body']['ns2:getPersonaListResponse']['personaListReturn']['persona']
+
+        } catch (error) {
+            return error
+        }
+
+    }
+
+    async getPersonaList_v2({ cuitRepresentada, cuitsConsulta = [] }) {
+
+        const wsaa = new WSAA(cuitRepresentada, 'ws_sr_constancia_inscripcion')
+        const ticket = await wsaa.obtenerTicket()
+
+        const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:a5="http://a5.soap.ws.server.puc.sr/">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <a5:getPersonaList_v2>
+            <token>${ticket.token}</token>
+            <sign>${ticket.sign}</sign>
+            <cuitRepresentada>${cuitRepresentada}</cuitRepresentada>
+            ${cuitsConsulta.map( e => `<idPersona>${e}</idPersona>` ).join('') }
+        </a5:getPersonaList_v2>
+    </soapenv:Body>
+</soapenv:Envelope>`
+
+        try {
+            const respuesta = await this.consultaSOAP('getPersonaList_v2', xmlRequest)
+
+            return respuesta['soap:Envelope']['soap:Body']['ns2:getPersonaList_v2Response']['personaListReturn']['persona']
 
         } catch (error) {
             return error
@@ -139,9 +167,9 @@ class WS_SR_CONSTANCIA_INSCRIPCION {
 }
 
 const ws = new WS_SR_CONSTANCIA_INSCRIPCION()
-ws.getPersonaList({cuitRepresentada: 30714518549, cuitsConsulta: [30715327720, 27332276714]})
+ws.getPersonaList_v2({cuitRepresentada: 30714518549, cuitsConsulta: [30715327720, 27332276714, 20405003644]})
 .then(res => {
-    fs.writeFileSync(`ticketresultConstancia-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
+    fs.writeFileSync(`./results/ws_sr_constancia_inscripcion/ticketresultConstancia-${new Date().getTime()}.json`, JSON.stringify(res, null, 4), 'utf8');
 })
 
 //module.exports = WS_SR_CONSTANCIA_INSCRIPCION
